@@ -18,4 +18,10 @@ public class Member : IEntity
         Name = name;
         Email = email;
     }
+
+    public static Member CreateNew()
+    {
+        string number = Guid.NewGuid().ToString("N");
+        return new Member($"Читач {number}", $"{number}@example.com");
+    }
 }

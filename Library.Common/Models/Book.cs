@@ -37,7 +37,7 @@ public class Book : IEntity
         Id = Guid.NewGuid();
         Title = title;
         Author = author;
-        _createdCount++;
+        Interlocked.Increment(ref _createdCount);
     }
 
     // Метод
@@ -51,6 +51,11 @@ public class Book : IEntity
     // Статичний метод
     public static int GetCreatedCount()
     {
-        return _createdCount;
+        return Volatile.Read(ref _createdCount);
+    }
+
+    public static Book CreateNew()
+    {
+        return new Book($"Книга {Guid.NewGuid():N}", "Невідомий автор");
     }
 }
