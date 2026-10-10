@@ -17,4 +17,10 @@ public class EBook : Book
         FileSizeMb = fileSizeMb;
         DownloadUrl = downloadUrl;
     }
+
+    public new static EBook CreateNew()
+    {
+        return new EBook($"Електронна книга {Guid.NewGuid():N}", "Автор", "EPUB",
+            Math.Round(Random.Shared.NextDouble() * 9 + 1, 2), "https://example.com/book.epub");
+    }
 }

@@ -17,4 +17,10 @@ public class PrintedBook : Book
         Publisher = publisher;
         ShelfNumber = shelfNumber;
     }
+
+    public new static PrintedBook CreateNew()
+    {
+        return new PrintedBook($"Друкована книга {Guid.NewGuid():N}", "Автор",
+            Random.Shared.Next(100, 801), "Дніпро", $"A-{Random.Shared.Next(1, 101):D3}");
+    }
 }
