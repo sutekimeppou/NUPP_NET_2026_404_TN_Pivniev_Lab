@@ -428,3 +428,5 @@ FodyWeavers.xsd
 #*.lscache
 
 library-data.json
+*.db-wal
+*.db-shm

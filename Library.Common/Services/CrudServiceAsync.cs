@@ -5,7 +5,7 @@ using Library.Common.Interfaces;
 
 namespace Library.Common.Services;
 
-public class CrudServiceAsync<T> : ICrudServiceAsync<T>, IDisposable where T : class, IEntity
+public class CrudServiceAsync<T> : ICrudServiceAsync<T>, IEnumerable<T>, IDisposable where T : class, IEntity
 {
     private readonly ConcurrentDictionary<Guid, T> _elements = new();
     private readonly SemaphoreSlim _saveGate = new(1, 1);

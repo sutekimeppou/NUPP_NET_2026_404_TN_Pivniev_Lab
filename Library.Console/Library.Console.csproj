@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Library.Common\Library.Common.csproj" />
+    <ProjectReference Include="..\Library.Infrastructure\Library.Infrastructure.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
