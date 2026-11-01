@@ -1,103 +1,65 @@
-using System.Globalization;
 using System.Text;
+using Library.Common.Extensions;
 using Library.Common.Models;
-using Library.Common.Services;
+using Library.Infrastructure;
+using Library.Infrastructure.Mapping;
+using Library.Infrastructure.Models;
+using Library.Infrastructure.Repositories;
+using Library.Infrastructure.Services;
+using Microsoft.EntityFrameworkCore;
 
 Console.OutputEncoding = Encoding.UTF8;
-CultureInfo.CurrentCulture = CultureInfo.GetCultureInfo("uk-UA");
+Console.WriteLine("Лабораторна робота №3. Entity Framework і SQLite");
 
-Console.WriteLine("Лабораторна робота №2. Асинхронність і потоки");
+var options = new DbContextOptionsBuilder<LibraryContext>()
+    .UseSqlite($"Data Source={LibraryDatabase.GetPath()}")
+    .Options;
 
-using var books = new CrudServiceAsync<Book>("library-data.json");
+await using var context = new LibraryContext(options);
 
-await Parallel.ForEachAsync(Enumerable.Range(0, 2000), async (index, _) =>
-{
-    Book book = index % 2 == 0 ? PrintedBook.CreateNew() : EBook.CreateNew();
+await context.Database.MigrateAsync();
+await LibrarySeed.InitializeAsync(context);
 
-    if (!await books.CreateAsync(book))
-    {
-        throw new InvalidOperationException("Повторюваний Id.");
-    }
-});
+var repository = new Repository<BookModel>(context);
+var books = new DatabaseCrudService<Book, BookModel>(repository, new BookMapper());
+var members = new DatabaseCrudService<Member, MemberModel>(
+    new Repository<MemberModel>(context), new MemberMapper());
 
-Book[] all = (await books.ReadAllAsync()).ToArray();
-PrintedBook[] printed = all.OfType<PrintedBook>().ToArray();
-EBook[] electronic = all.OfType<EBook>().ToArray();
+Console.WriteLine("\nREAD ALL: книги з бази даних");
 
-Console.WriteLine($"\nParallel: створено {all.Length} книг, Id унікальні: {all.Select(b => b.Id).Distinct().Count()}");
-Console.WriteLine($"Друковані: {printed.Length}; електронні: {electronic.Length}");
-Console.WriteLine($"Сторінки: min={printed.Min(b => b.PageCount)}, max={printed.Max(b => b.PageCount)}, avg={printed.Average(b => b.PageCount):F2}");
-Console.WriteLine($"Розмір МБ: min={electronic.Min(b => b.FileSizeMb):F2}, max={electronic.Max(b => b.FileSizeMb):F2}, avg={electronic.Average(b => b.FileSizeMb):F2}");
-Console.WriteLine($"Статичний лічильник Book: {Book.GetCreatedCount()}");
-Console.WriteLine($"IEnumerable: foreach бачить {books.Count()} книг");
+foreach (Book book in await books.ReadAllAsync())
+    Console.WriteLine(book.ToDisplayString());
 
-Book[] firstPage = (await books.ReadAllAsync(1, 10)).ToArray();
-Book[] secondPage = (await books.ReadAllAsync(2, 10)).ToArray();
+BookModel first = (await repository.GetAllAsync()).First();
 
-Console.WriteLine($"\nПагінація: сторінка 1 — {firstPage.Length}, сторінка 2 — {secondPage.Length}");
-Console.WriteLine($"Спільних Id на сторінках: {firstPage.Select(b => b.Id).Intersect(secondPage.Select(b => b.Id)).Count()}");
+Console.WriteLine($"\nДва ідентифікатори: SQL Id={first.Id}, PublicId={first.PublicId}");
+Console.WriteLine($"Repository.GetByIdAsync(int): {(await repository.GetByIdAsync(first.Id)).Title}");
+Console.WriteLine($"CRUD.ReadAsync(Guid): {(await books.ReadAsync(first.PublicId)).Title}");
+Console.WriteLine($"Пагінація: сторінка 1 містить {(await books.ReadAllAsync(1, 1)).Count()} запис");
 
-Book selected = firstPage[0];
-Console.WriteLine($"ReadAsync: знайдено {((await books.ReadAsync(selected.Id)).Id == selected.Id)}");
+var demo = new PrintedBook("Тестова книга", "Автор", 200, "Дніпро", "T-01");
 
-var updated = new Book("Оновлена книга", selected.Author) { Id = selected.Id };
-Console.WriteLine($"UpdateAsync: {await books.UpdateAsync(updated)}");
+Console.WriteLine($"\nCREATE: {await books.CreateAsync(demo)}");
+await books.SaveAsync();
 
-Console.WriteLine($"RemoveAsync: {await books.RemoveAsync(updated)}");
+demo.PageCount = 240;
+Console.WriteLine($"UPDATE: {await books.UpdateAsync(demo)}");
+await books.SaveAsync();
+Console.WriteLine($"Після оновлення: {((PrintedBook)await books.ReadAsync(demo.Id)).PageCount} сторінок");
 
-await Task.WhenAll(books.SaveAsync(), books.SaveAsync());
-Console.WriteLine($"SaveAsync: JSON збережено, записів: {books.Count()}");
+Console.WriteLine($"REMOVE: {await books.RemoveAsync(demo)}");
+await books.SaveAsync();
 
-object gate = new();
-int counter = 0;
+Console.WriteLine($"Книг після видалення: {(await books.ReadAllAsync()).Count()}");
+Console.WriteLine($"Читачів: {(await members.ReadAllAsync()).Count()}");
 
-Parallel.For(0, 1000, _ =>
-{
-    lock (gate)
-    {
-        counter++;
-    }
-});
+Console.WriteLine($"\n1:1 — читацьких карток: {await context.MemberCards.CountAsync()}");
+Console.WriteLine($"1:N — видач книг: {await context.Loans.CountAsync()}");
 
-Console.WriteLine($"\nlock: лічильник після 1000 збільшень = {counter}");
+int bookTags = await context.Set<Dictionary<string, object>>("BookTags").CountAsync();
 
-using var semaphore = new Semaphore(2, 2);
-int active = 0;
-int peak = 0;
-
-await Task.WhenAll(Enumerable.Range(0, 6).Select(_ => Task.Run(() =>
-{
-    semaphore.WaitOne();
-
-    try
-    {
-        lock (gate)
-        {
-            active++;
-            peak = Math.Max(peak, active);
-        }
-
-        Thread.Sleep(30);
-
-        lock (gate)
-        {
-            active--;
-        }
-    }
-    finally
-    {
-        semaphore.Release();
-    }
-})));
-
-Console.WriteLine($"Semaphore: одночасних виконавців максимум {peak}, ліміт 2");
-
-using var signal = new AutoResetEvent(false);
-Task worker = Task.Run(() => signal.WaitOne());
-
-signal.Set();
-await worker;
-
-Console.WriteLine("AutoResetEvent: очікування завершено після Set()");
+Console.WriteLine($"M:N — зв'язків книга/тег: {bookTags}");
+Console.WriteLine("TPT — Books, PrintedBooks, EBooks");
+Console.WriteLine("База даних: library.db");
 
 Console.WriteLine("\nДемонстрацію завершено.");

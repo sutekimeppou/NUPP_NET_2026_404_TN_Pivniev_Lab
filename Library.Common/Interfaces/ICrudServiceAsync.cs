@@ -1,6 +1,6 @@
 namespace Library.Common.Interfaces;
 
-public interface ICrudServiceAsync<T> : IEnumerable<T>
+public interface ICrudServiceAsync<T>
 {
     Task<bool> CreateAsync(T element);
     Task<T> ReadAsync(Guid id);
