@@ -1,0 +1,19 @@
+@host = http://localhost:5084
+
+GET {{host}}/api/books?page=1&amount=10
+
+###
+GET {{host}}/api/members?page=1&amount=10
+
+###
+POST {{host}}/api/books
+Content-Type: application/json
+
+{
+  "title": "Тестова книга",
+  "author": "Автор",
+  "kind": "printed",
+  "pageCount": 200,
+  "publisher": "Дніпро",
+  "shelfNumber": "T-01"
+}

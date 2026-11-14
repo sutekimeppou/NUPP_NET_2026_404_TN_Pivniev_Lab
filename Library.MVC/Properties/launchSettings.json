@@ -1,0 +1,13 @@
+{
+  "profiles": {
+    "Library.MVC": {
+      "commandName": "Project",
+      "launchBrowser": false,
+      "launchUrl": "Members",
+      "applicationUrl": "http://localhost:5086",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}
